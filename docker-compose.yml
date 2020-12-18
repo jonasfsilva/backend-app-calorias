@@ -1,0 +1,54 @@
+version: '3'
+
+services:
+  app-calorias-database:
+    container_name: app-calorias-database
+    image: kartoza/postgis:12.1
+    environment:
+      - POSTGRES_DB=app-calorias_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=app-calorias2020
+      - POSTGRES_HOST=127.0.0.1
+    # volumes:
+      # - ./data/postgres/data:/var/lib/postgresql/data
+
+  app-calorias-web:
+    container_name: app-calorias-web
+    build: .
+    restart: on-failure
+    volumes:
+      - .:/srv/app
+    command: sh ./run_web.sh
+    env_file:
+      - "environment.env"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - app-calorias-database
+  
+  app-calorias-broker:
+    container_name: app-calorias-broker
+    image: rabbitmq:3.7-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "app-calorias"
+      RABBITMQ_DEFAULT_PASS: "app-calorias2020"
+
+  app-calorias-worker:
+    container_name: app-calorias-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - "environment.env"
+
+    command: sh ./run_worker.sh
+    volumes:
+      - .:/srv/app
+    links:
+      - app-calorias-broker
+    depends_on:
+      - app-calorias-database
+      - app-calorias-broker
